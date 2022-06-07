@@ -7,8 +7,9 @@ const fragment = require("./shader/fragment.glsl");
 const vertex = require("./shader/vertex.glsl");
 
 import mask from './mask.jpg'
-import t1 from './myphoto.jpg'
-import t2 from './pole2.jpg'
+import t1 from './piramid.png'
+import t2 from './lol.png'
+import t3 from './metal2.png'
 
 export class Sketch {
     constructor() {
@@ -27,13 +28,17 @@ export class Sketch {
 
         this.textures = [
             new THREE.TextureLoader().load(t1),
-            new THREE.TextureLoader().load(t2)
+            new THREE.TextureLoader().load(t2),
+            new THREE.TextureLoader().load(t3),
         ]
         this.mask = new THREE.TextureLoader().load(mask);
 
         this.time = 0;
         this.move = 0;
-        // this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+        this.prevFr = 0
+        this.currentFr = 1;
+        this.nextFr = 2;
+        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         this.addMash();
 
         this.mouseEffects(); 
@@ -47,25 +52,98 @@ export class Sketch {
             new THREE.MeshBasicMaterial()
         )
 
-        window.addEventListener('mousedown', (e) => {
+        const clickEventStart = (e) => {
             gsap.to(this.material.uniforms.mousePressed, {
                 duration: 0.5,
                 value: 1,
-                ease: 'elastic.out(1, 0.7'
+                // ease: 'elastic.out(1, 0.7)'
             })
-        })
-
-        window.addEventListener('mouseup', (e) => {
+        }
+        const clickEventEnd = (e) => {
             gsap.to(this.material.uniforms.mousePressed, {
                 duration: 0.5,
                 value: 0,
-                ease: 'elastic.out(1, 0.3'
+                // ease: 'elastic.out(1, 0.6)'
             })
+        }
+
+        window.addEventListener('mousedown', clickEventStart)
+        window.addEventListener('mouseup', clickEventEnd)
+
+        let lastTouch = 0;
+
+        window.addEventListener('touchstart', (e) => {
+            console.log(e.touches[0]);
+            lastTouch = e.touches[0].clientY;
+        })
+        window.addEventListener('touchend', (e) => {
+            console.log(e.touches[0])
+        })
+        window.addEventListener('touchmove', async (e) => {
+            console.log(e.touches[0].clientY)
+            let currentTouch = e.touches[0].clientY || 0;
+            if (lastTouch - currentTouch > 0) {
+                gsap.to(this, {
+                    duration: 3,
+                    move: this.move + 1 > this.textures.length - 1 
+                    ? 0 : Math.floor(this.move) + 1,
+                })
+            } else if (lastTouch - currentTouch < 0) {
+                gsap.to(this, {
+                    duration: 3,
+                    move: this.move - 1 < 0 
+                    ? this.textures.length - 1 : Math.floor(this.move) - 1,
+                })
+            }
+            await gsap.to(this.material.uniforms.transition, {
+                duration: 1.5,
+                value: 0,
+            })
+            await gsap.to(this.material.uniforms.transition, {
+                duration: 1.5,
+                value: 1,
+            })
+            lastTouch = e.touches[0].clientY;
         })
 
-        window.addEventListener('wheel', (e) => {
-            this.move += e.deltaY*.001*Math.random();
-            console.log(this.move)
+        window.addEventListener('wheel', async (e) => {
+            // this.move += e.deltaY*.001*Math.random();
+
+            if (e.deltaY > 0) {
+                
+                gsap.to(this, {
+                    duration: 3,
+                    move: this.move + 1 > this.textures.length - 1 
+                    ? 0 : Math.floor(this.move) + 1,
+                })
+                // gsap.to(this, {
+                //     duration: 3,
+                //     move: 1,
+                // })
+                // this.currentFr = this.currentFr === this.textures.length 
+                //     ? 0 : this.currentFr + 1;
+            } else {
+                gsap.to(this, {
+                    duration: 3,
+                    move: this.move - 1 < 0 
+                    ? this.textures.length - 1 : Math.floor(this.move) - 1,
+                })
+                // gsap.to(this, {
+                //     duration: 3,
+                //     move: 0,
+                // })
+                // this.currentFr = this.currentFr === 0 
+                //     ? this.textures.length : this.currentFr - 1;
+            }
+
+            await gsap.to(this.material.uniforms.transition, {
+                duration: 1.5,
+                value: 0,
+            })
+            await gsap.to(this.material.uniforms.transition, {
+                duration: 1.5,
+                value: 1,
+            })
         })
 
         window.addEventListener( 'mousemove', (event) => {
@@ -76,8 +154,8 @@ export class Sketch {
 
             // calculate objects intersecting the picking ray
             let intersects = this.raycaster.intersectObjects( [this.test] ); 
-            this.points.x = intersects[0].point.x || 0;
-            this.points.y = intersects[0].point.y || 0;
+            this.points.x = intersects[0]?.point.x || 0;
+            this.points.y = intersects[0]?.point.y || 0;
 
         }, false )
     }
@@ -95,11 +173,12 @@ export class Sketch {
                 mousePressed: {type: "f", value: 0},
                 move: {type: "f", value: 0},
                 time: {type: "f", value: 0},
+                transition: {type: "f", value: 1},
             },
             side: THREE.DoubleSide,
             transparent: true,
             depthTest: false,
-            depthWrite: false
+            // depthWrite: false
         })
         this.geometry = new THREE.BufferGeometry()
         let number = 512*512;
@@ -141,13 +220,13 @@ export class Sketch {
     }
 
     render() {
-        this.time++
-        let next = Math.floor(this.move)%2;
-        let prev = (Math.floor(this.move) + 1)%2;
+        this.time++;
+        let next = Math.floor(this.move);
+        let prev = (Math.floor(this.move) + 1);
 
         
-        this.material.uniforms.t1.value = this.textures[prev];
-        this.material.uniforms.t2.value = this.textures[next];
+        this.material.uniforms.t1.value = this.textures[next];
+        this.material.uniforms.t2.value = this.textures[prev];
 
         this.material.uniforms.time.value = this.time;
         this.material.uniforms.move.value = this.move;

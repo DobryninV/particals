@@ -33,12 +33,12 @@ void main() {
     stable.y += 50.*sin(.1*time*aPress)*aDirection * area*mousePressed;
     stable.z += 200.*cos(.1*time*aPress)*aDirection * area*mousePressed;
 
-    // pos = mix(pos, stable, )
+    pos = mix(pos, stable, transition);
 
 
     //Stable
-    vec4 mvPosition = modelViewMatrix * vec4( stable, 1. );
-    gl_PointSize = 2000. * (1. / -mvPosition.z);
+    vec4 mvPosition = modelViewMatrix * vec4( pos, 1. );
+    gl_PointSize = 1600. * (1. / -mvPosition.z);
     gl_Position = projectionMatrix * mvPosition;
 
     vCoordinates = aCoordinates.xy;
